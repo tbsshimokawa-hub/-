@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>S&P 500 × 現金 資産配分バックテスト</title>
+  <meta name="description" content="S&P 500と現金の配分比率を変えた資産運用をバックテストするシミュレーター">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+JP:wght@300;400;500;700&display=swap"
+    rel="stylesheet">
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg-primary: #0a0e1a;
+      --bg-secondary: #111827;
+      --bg-card: rgba(17, 24, 39, 0.7);
+      --border-card: rgba(255, 255, 255, 0.08);
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --accent-blue: #3b82f6;
+      --accent-cyan: #06b6d4;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --accent-purple: #8b5cf6;
+      --gradient-hero: linear-gradient(135deg, #1e3a5f 0%, #0a0e1a 50%, #1a0e2e 100%);
+      --glass-bg: rgba(255, 255, 255, 0.04);
+      --glass-border: rgba(255, 255, 255, 0.1);
+      --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      --radius: 16px;
+      --radius-sm: 10px;
+      --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    body {
+      font-family: 'Inter', 'Noto Sans JP', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* Background animated gradient */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--gradient-hero);
+      z-index: -2;
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(ellipse at 20% 50%, rgba(59, 130, 246, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, rgba(139, 92, 246, 0.06) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 80%, rgba(6, 182, 212, 0.05) 0%, transparent 50%);
+      z-index: -1;
+      animation: bgShift 20s ease-in-out infinite alternate;
+    }
+
+    @keyframes bgShift {
+      0% {
+        transform: translate(0, 0) rotate(0deg);
+      }
+
+      100% {
+        transform: translate(-5%, 3%) rotate(3deg);
+      }
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px 20px 60px;
+    }
+
+    /* ─── Header ─── */
+    header {
+      text-align: center;
+      padding: 48px 0 36px;
+    }
+
+    header .badge {
+      display: inline-block;
+      padding: 6px 16px;
+      border-radius: 20px;
+      background: rgba(59, 130, 246, 0.15);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      color: var(--accent-blue);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    header h1 {
+      font-size: clamp(28px, 5vw, 44px);
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #f1f5f9 0%, #94a3b8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 10px;
+    }
+
+    header p {
+      color: var(--text-secondary);
+      font-size: 15px;
+      max-width: 560px;
+      margin: 0 auto;
+    }
+
+    /* ─── Glass Card ─── */
+    .card {
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius);
+      box-shadow: var(--glass-shadow);
+      padding: 28px;
+      margin-bottom: 24px;
+      transition: var(--transition);
+    }
+
+    .card:hover {
+      border-color: rgba(255, 255, 255, 0.15);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    .card-title {
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-title .icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .card-title .icon.blue {
+      background: rgba(59, 130, 246, 0.15);
+    }
+
+    .card-title .icon.emerald {
+      background: rgba(16, 185, 129, 0.15);
+    }
+
+    .card-title .icon.purple {
+      background: rgba(139, 92, 246, 0.15);
+    }
+
+    .card-title .icon.amber {
+      background: rgba(245, 158, 11, 0.15);
+    }
+
+    /* ─── Form Grid ─── */
+    .params-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+    }
+
+    .param-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .param-group label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .param-group .value-display {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.1);
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+      box-shadow: 0 0 12px rgba(59, 130, 246, 0.5);
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+      box-shadow: 0 0 12px rgba(59, 130, 246, 0.5);
+      cursor: pointer;
+      border: none;
+    }
+
+    input[type="number"] {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--glass-border);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-primary);
+      font-family: 'Inter', sans-serif;
+      font-size: 15px;
+      font-weight: 500;
+      outline: none;
+      transition: var(--transition);
+    }
+
+    input[type="number"]:focus {
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+    }
+
+    input[type="number"]::-webkit-inner-spin-button {
+      opacity: 0.5;
+    }
+
+    /* Allocation bar */
+    .alloc-bar-container {
+      margin-top: 4px;
+    }
+
+    .alloc-bar {
+      height: 28px;
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 28px;
+    }
+
+    .alloc-bar .sp500 {
+      background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+      color: #fff;
+      text-align: center;
+      transition: width 0.3s ease;
+      white-space: nowrap;
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    .alloc-bar .cash {
+      background: linear-gradient(90deg, var(--accent-emerald), var(--accent-cyan));
+      color: #fff;
+      text-align: center;
+      transition: width 0.3s ease;
+      white-space: nowrap;
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    .alloc-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .period-display {
+      margin-top: 8px;
+      padding: 10px 16px;
+      border-radius: 8px;
+      background: rgba(59, 130, 246, 0.08);
+      border: 1px solid rgba(59, 130, 246, 0.15);
+      font-size: 14px;
+      color: var(--text-secondary);
+      text-align: center;
+      transition: var(--transition);
+    }
+
+    .period-display strong {
+      color: var(--accent-cyan);
+    }
+
+    /* ─── Run Button ─── */
+    .run-btn {
+      display: block;
+      width: 100%;
+      padding: 14px;
+      margin-top: 28px;
+      border: none;
+      border-radius: var(--radius-sm);
+      background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
+      color: #fff;
+      font-family: 'Inter', 'Noto Sans JP', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: var(--transition);
+      letter-spacing: 0.5px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .run-btn::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+      transition: left 0.5s ease;
+    }
+
+    .run-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(59, 130, 246, 0.35);
+    }
+
+    .run-btn:hover::after {
+      left: 100%;
+    }
+
+    .run-btn:active {
+      transform: translateY(0);
+    }
+
+    /* ─── Summary Cards ─── */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .summary-card {
+      background: var(--glass-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      padding: 20px;
+      text-align: center;
+      transition: var(--transition);
+    }
+
+    .summary-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .summary-card .label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .summary-card .value {
+      font-size: 26px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .summary-card .sub {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    .positive {
+      color: var(--accent-emerald);
+    }
+
+    .negative {
+      color: var(--accent-rose);
+    }
+
+    .blue-val {
+      color: var(--accent-blue);
+    }
+
+    .amber-val {
+      color: var(--accent-amber);
+    }
+
+    .purple-val {
+      color: var(--accent-purple);
+    }
+
+    .cyan-val {
+      color: var(--accent-cyan);
+    }
+
+    /* ─── Chart ─── */
+    .chart-wrapper {
+      position: relative;
+      width: 100%;
+      height: 420px;
+    }
+
+    .chart-wrapper canvas {
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    /* ─── Annual Returns Table ─── */
+    .returns-table-wrapper {
+      max-height: 400px;
+      overflow-y: auto;
+      border-radius: var(--radius-sm);
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+    }
+
+    .returns-table-wrapper::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .returns-table-wrapper::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .returns-table-wrapper::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      background: rgba(17, 24, 39, 0.95);
+      backdrop-filter: blur(8px);
+      padding: 10px 12px;
+      text-align: right;
+      font-weight: 600;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--glass-border);
+      font-size: 12px;
+      z-index: 1;
+    }
+
+    thead th:first-child {
+      text-align: left;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      transition: background 0.15s ease;
+    }
+
+    tbody tr:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    tbody td {
+      padding: 8px 12px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      color: var(--text-secondary);
+    }
+
+    tbody td:first-child {
+      text-align: left;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    /* ─── Footer ─── */
+    footer {
+      text-align: center;
+      padding: 40px 0 20px;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    footer a {
+      color: var(--accent-blue);
+      text-decoration: none;
+    }
+
+    /* ─── Responsive ─── */
+    @media (max-width: 640px) {
+      .container {
+        padding: 16px 12px 40px;
+      }
+
+      .card {
+        padding: 20px 16px;
+      }
+
+      .params-grid {
+        grid-template-columns: 1fr;
+        gap: 18px;
+      }
+
+      .summary-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .summary-card .value {
+        font-size: 20px;
+      }
+
+      .chart-wrapper {
+        height: 300px;
+      }
+
+      header {
+        padding: 32px 0 24px;
+      }
+    }
+
+    /* ─── Animations ─── */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(24px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .animate-in {
+      animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      opacity: 0;
+    }
+
+    .delay-1 {
+      animation-delay: 0.1s;
+    }
+
+    .delay-2 {
+      animation-delay: 0.2s;
+    }
+
+    .delay-3 {
+      animation-delay: 0.3s;
+    }
+
+    .delay-4 {
+      animation-delay: 0.4s;
+    }
+
+    /* Disclaimer */
+    .disclaimer {
+      margin-top: 12px;
+      padding: 14px 18px;
+      border-radius: var(--radius-sm);
+      background: rgba(245, 158, 11, 0.07);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+
+    .disclaimer strong {
+      color: var(--accent-amber);
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="container">
+    <!-- Header -->
+    <header class="animate-in">
+      <div class="badge">Backtest Simulator</div>
+      <h1>S&P 500 × 現金<br>資産配分バックテスト</h1>
+      <p>過去の実績データに基づき、S&P 500と現金の配分比率を変えた資産推移をシミュレーションします。</p>
+    </header>
+
+    <!-- Parameters Card -->
+    <div class="card animate-in delay-1">
+      <div class="card-title">
+        <div class="icon blue">⚙</div>
+        パラメータ設定
+      </div>
+
+      <div class="params-grid">
+        <!-- Allocation -->
+        <div class="param-group" style="grid-column: 1 / -1;">
+          <label>
+            <span>S&P 500 配分比率</span>
+            <span class="value-display" id="allocDisplay">70%</span>
+          </label>
+          <input type="range" id="allocation" min="0" max="100" value="70" step="5">
+          <div class="alloc-bar-container">
+            <div class="alloc-bar">
+              <div class="sp500" id="barSP" style="width:70%">S&P 500: 70%</div>
+              <div class="cash" id="barCash" style="width:30%">現金: 30%</div>
+            </div>
+            <div class="alloc-labels">
+              <span>📈 S&P 500（高リスク・高リターン）</span>
+              <span>💴 現金（安全資産）</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Initial Amount -->
+        <div class="param-group">
+          <label>初期資産額（万円）</label>
+          <input type="number" id="initialAmount" value="1000" min="0" step="100">
+        </div>
+
+        <!-- Monthly Cashflow -->
+        <div class="param-group">
+          <label>毎月キャッシュフロー（万円）</label>
+          <input type="number" id="monthlyCF" value="10" step="1">
+        </div>
+
+        <!-- Duration + Auto Period -->
+        <div class="param-group" style="grid-column: 1 / -1;">
+          <label>
+            <span>シミュレーション期間</span>
+            <span class="value-display" id="durationDisplay">30年間</span>
+          </label>
+          <input type="range" id="duration" min="1" max="51" value="30" step="1">
+          <div class="period-display" id="periodDisplay">
+            📅 <strong>1996年</strong> 〜 <strong>2025年</strong>（直近30年間のデータでバックテスト）
+          </div>
+        </div>
+      </div>
+
+      <button class="run-btn" id="runBtn" onclick="runSimulation()">
+        ▶　シミュレーション実行
+      </button>
+
+      <div class="disclaimer">
+        <strong>⚠ ご注意：</strong>
+        本シミュレーションは過去の実績データに基づくバックテストであり、将来の運用成果を保証するものではありません。
+        S&P 500のリターンは配当再投資を含む年間トータルリターンを使用しています。現金は年利0.001%で計算しています。
+        毎月のキャッシュフローは月初に投入され、年初にリバランス（配分比率の再調整）が行われるモデルです。
+      </div>
+    </div>
+
+    <!-- Results Section (hidden initially) -->
+    <div id="results" class="hidden">
+      <!-- Summary Cards -->
+      <div class="summary-grid animate-in delay-1">
+        <div class="summary-card">
+          <div class="label">最終資産額</div>
+          <div class="value blue-val" id="sumFinal">—</div>
+          <div class="sub" id="sumFinalSub"></div>
+        </div>
+        <div class="summary-card">
+          <div class="label">累計投資額</div>
+          <div class="value cyan-val" id="sumInvested">—</div>
+          <div class="sub" id="sumInvestedSub"></div>
+        </div>
+        <div class="summary-card">
+          <div class="label">利益</div>
+          <div class="value" id="sumProfit">—</div>
+          <div class="sub" id="sumProfitSub"></div>
+        </div>
+        <div class="summary-card">
+          <div class="label">利益率</div>
+          <div class="value" id="sumReturn">—</div>
+          <div class="sub" id="sumReturnSub"></div>
+        </div>
+      </div>
+
+      <!-- Comparison Summary -->
+      <div class="summary-grid animate-in delay-2">
+        <div class="summary-card">
+          <div class="label">S&P 500 100%の場合</div>
+          <div class="value purple-val" id="sumSP100">—</div>
+          <div class="sub" id="sumSP100Sub"></div>
+        </div>
+        <div class="summary-card">
+          <div class="label">現金 100%の場合</div>
+          <div class="value amber-val" id="sumCash100">—</div>
+          <div class="sub" id="sumCash100Sub"></div>
+        </div>
+        <div class="summary-card">
+          <div class="label">最大ドローダウン（混合）</div>
+          <div class="value negative" id="sumDrawdown">—</div>
+          <div class="sub">ピークからの最大下落率</div>
+        </div>
+        <div class="summary-card">
+          <div class="label">年平均成長率（CAGR）</div>
+          <div class="value positive" id="sumCAGR">—</div>
+          <div class="sub">複利ベースの年率リターン</div>
+        </div>
+      </div>
+
+      <!-- Chart -->
+      <div class="card animate-in delay-2">
+        <div class="card-title">
+          <div class="icon emerald">📊</div>
+          資産推移チャート
+        </div>
+        <div class="chart-wrapper">
+          <canvas id="mainChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Annual Breakdown -->
+      <div class="card animate-in delay-3">
+        <div class="card-title">
+          <div class="icon purple">📋</div>
+          年別詳細
+        </div>
+        <div class="returns-table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>年</th>
+                <th>S&P 500 リターン</th>
+                <th>混合 資産額</th>
+                <th>S&P 100% 資産額</th>
+                <th>現金100% 資産額</th>
+                <th>累計投資額</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>S&P 500 Historical Backtest Simulator — Built with ❤ for long-term investors</p>
+  </footer>
+
+  <script>
+    // ────────────────────────────────────
+    // S&P 500 Total Returns (incl. dividends) — 1975 to 2025
+    // ────────────────────────────────────
+    const SP500_RETURNS = {
+      1975: 0.3720, 1976: 0.2384, 1977: -0.0718, 1978: 0.0656, 1979: 0.1844,
+      1980: 0.3242, 1981: -0.0491, 1982: 0.2141, 1983: 0.2251, 1984: 0.0627,
+      1985: 0.3216, 1986: 0.1847, 1987: 0.0581, 1988: 0.1654, 1989: 0.3148,
+      1990: -0.0306, 1991: 0.3023, 1992: 0.0762, 1993: 0.1008, 1994: 0.0132,
+      1995: 0.3743, 1996: 0.2296, 1997: 0.3336, 1998: 0.2858, 1999: 0.2104,
+      2000: -0.0910, 2001: -0.1189, 2002: -0.2210, 2003: 0.2889, 2004: 0.1088,
+      2005: 0.0491, 2006: 0.1579, 2007: 0.0549, 2008: -0.3700, 2009: 0.2646,
+      2010: 0.1506, 2011: 0.0211, 2012: 0.1600, 2013: 0.3239, 2014: 0.1369,
+      2015: 0.0138, 2016: 0.1196, 2017: 0.2183, 2018: -0.0438, 2019: 0.3149,
+      2020: 0.1840, 2021: 0.2871, 2022: -0.1811, 2023: 0.2629, 2024: 0.2502,
+      2025: 0.0200  // estimated partial year
+    };
+
+    const CASH_ANNUAL_RATE = 0.00001; // 0.001% (日本の普通預金金利相当)
+
+    let mainChart = null;
+
+    // ─── Slider UI Sync ───
+    const allocSlider = document.getElementById('allocation');
+    const allocDisplay = document.getElementById('allocDisplay');
+    const barSP = document.getElementById('barSP');
+    const barCash = document.getElementById('barCash');
+
+    allocSlider.addEventListener('input', () => {
+      const v = parseInt(allocSlider.value);
+      allocDisplay.textContent = v + '%';
+      barSP.style.width = v + '%';
+      barSP.textContent = v > 10 ? `S&P 500: ${v}%` : '';
+      barCash.style.width = (100 - v) + '%';
+      barCash.textContent = (100 - v) > 10 ? `現金: ${100 - v}%` : '';
+    });
+
+    const durationSlider = document.getElementById('duration');
+    const durationDisplay = document.getElementById('durationDisplay');
+    const periodDisplay = document.getElementById('periodDisplay');
+
+    // Latest year with data
+    const LATEST_YEAR = Math.max(...Object.keys(SP500_RETURNS).map(Number));
+    const EARLIEST_YEAR = Math.min(...Object.keys(SP500_RETURNS).map(Number));
+    const MAX_DURATION = LATEST_YEAR - EARLIEST_YEAR + 1;
+    durationSlider.max = MAX_DURATION;
+
+    function getStartYear() {
+      return LATEST_YEAR - parseInt(durationSlider.value) + 1;
+    }
+
+    function updatePeriodDisplay() {
+      const dur = parseInt(durationSlider.value);
+      const startY = getStartYear();
+      durationDisplay.textContent = dur + '年間';
+      periodDisplay.innerHTML = `📅 <strong>${startY}年</strong> 〜 <strong>${LATEST_YEAR}年</strong>（直近${dur}年間のデータでバックテスト）`;
+    }
+
+    durationSlider.addEventListener('input', updatePeriodDisplay);
+    updatePeriodDisplay();
+
+    // ─── Format Helpers ───
+    function fmtMan(val) {
+      if (Math.abs(val) >= 10000) return (val / 10000).toFixed(2) + '億円';
+      return val.toFixed(0) + '万円';
+    }
+    function fmtPct(val) { return (val * 100).toFixed(2) + '%'; }
+
+    // ─── Simulation Core ───
+    function simulate(initialMan, monthlyCFMan, spRatio, startYear, years) {
+      const cashRatio = 1 - spRatio;
+      const monthlyRate_cash = Math.pow(1 + CASH_ANNUAL_RATE, 1 / 12) - 1;
+      const maxYear = Math.max(...Object.keys(SP500_RETURNS).map(Number));
+
+      // Track monthly data
+      let spAsset = initialMan * spRatio;
+      let cashAsset = initialMan * cashRatio;
+      let totalInvested = initialMan;
+      const dataPoints = [{ month: 0, total: initialMan, invested: initialMan, sp: spAsset, cash: cashAsset }];
+
+      let peak = initialMan;
+      let maxDrawdown = 0;
+
+      for (let y = 0; y < years; y++) {
+        const year = startYear + y;
+        if (year > maxYear) break;
+        const annualReturn = SP500_RETURNS[year] || 0;
+        const monthlyRate_sp = Math.pow(1 + annualReturn, 1 / 12) - 1;
+
+        // Rebalance at start of year (except first year, already allocated)
+        if (y > 0) {
+          const total = spAsset + cashAsset;
+          spAsset = total * spRatio;
+          cashAsset = total * cashRatio;
+        }
+
+        for (let m = 1; m <= 12; m++) {
+          // Monthly contribution at start of month
+          spAsset += monthlyCFMan * spRatio;
+          cashAsset += monthlyCFMan * cashRatio;
+          totalInvested += monthlyCFMan;
+
+          // Apply monthly returns
+          spAsset *= (1 + monthlyRate_sp);
+          cashAsset *= (1 + monthlyRate_cash);
+
+          const totalVal = spAsset + cashAsset;
+          dataPoints.push({
+            month: y * 12 + m,
+            total: totalVal,
+            invested: totalInvested,
+            sp: spAsset,
+            cash: cashAsset,
+            year: year,
+            monthInYear: m
+          });
+
+          if (totalVal > peak) peak = totalVal;
+          const dd = (peak - totalVal) / peak;
+          if (dd > maxDrawdown) maxDrawdown = dd;
+        }
+      }
+
+      return { dataPoints, maxDrawdown };
+    }
+
+    // ─── Run ───
+    function runSimulation() {
+      const alloc = parseInt(allocSlider.value) / 100;
+      const initial = parseFloat(document.getElementById('initialAmount').value) || 0;
+      const monthlyCF = parseFloat(document.getElementById('monthlyCF').value) || 0;
+      const duration = parseInt(durationSlider.value);
+      const startYear = getStartYear();
+
+      // Run 3 scenarios
+      const mix = simulate(initial, monthlyCF, alloc, startYear, duration);
+      const sp100 = simulate(initial, monthlyCF, 1.0, startYear, duration);
+      const cash100 = simulate(initial, monthlyCF, 0.0, startYear, duration);
+
+      const lastMix = mix.dataPoints[mix.dataPoints.length - 1];
+      const lastSP = sp100.dataPoints[sp100.dataPoints.length - 1];
+      const lastCash = cash100.dataPoints[cash100.dataPoints.length - 1];
+
+      const profitMix = lastMix.total - lastMix.invested;
+      const returnMix = lastMix.invested > 0 ? profitMix / lastMix.invested : 0;
+
+      // CAGR
+      const yearsActual = lastMix.month / 12;
+      let cagr = 0;
+      if (yearsActual > 0 && lastMix.invested > 0 && initial > 0) {
+        cagr = Math.pow(lastMix.total / initial, 1 / yearsActual) - 1;
+      }
+
+      // ─── Update Summary Cards ───
+      document.getElementById('sumFinal').textContent = fmtMan(lastMix.total);
+      document.getElementById('sumFinalSub').textContent = `${(parseInt(allocSlider.value))}% S&P 500 + ${100 - parseInt(allocSlider.value)}% 現金`;
+
+      document.getElementById('sumInvested').textContent = fmtMan(lastMix.invested);
+      document.getElementById('sumInvestedSub').textContent = `初期 ${fmtMan(initial)} + 毎月 ${monthlyCF}万円 × ${lastMix.month}ヶ月`;
+
+      document.getElementById('sumProfit').textContent = fmtMan(profitMix);
+      document.getElementById('sumProfit').className = 'value ' + (profitMix >= 0 ? 'positive' : 'negative');
+      document.getElementById('sumProfitSub').textContent = profitMix >= 0 ? '含み益' : '含み損';
+
+      document.getElementById('sumReturn').textContent = fmtPct(returnMix);
+      document.getElementById('sumReturn').className = 'value ' + (returnMix >= 0 ? 'positive' : 'negative');
+      document.getElementById('sumReturnSub').textContent = `投資額に対する利益率`;
+
+      document.getElementById('sumSP100').textContent = fmtMan(lastSP.total);
+      const sp100Return = lastSP.invested > 0 ? (lastSP.total - lastSP.invested) / lastSP.invested : 0;
+      document.getElementById('sumSP100Sub').textContent = `利益率: ${fmtPct(sp100Return)}`;
+
+      document.getElementById('sumCash100').textContent = fmtMan(lastCash.total);
+      const cash100Return = lastCash.invested > 0 ? (lastCash.total - lastCash.invested) / lastCash.invested : 0;
+      document.getElementById('sumCash100Sub').textContent = `利益率: ${fmtPct(cash100Return)}`;
+
+      document.getElementById('sumDrawdown').textContent = '-' + fmtPct(mix.maxDrawdown);
+      document.getElementById('sumCAGR').textContent = fmtPct(cagr);
+
+      // ─── Chart ───
+      const labels = [];
+      const dataMix = [];
+      const dataSP = [];
+      const dataCash = [];
+      const dataInvested = [];
+
+      // Sample points (every 3 months for readability)
+      for (let i = 0; i < mix.dataPoints.length; i++) {
+        if (i === 0 || i === mix.dataPoints.length - 1 || i % 3 === 0) {
+          const dp = mix.dataPoints[i];
+          const yr = startYear + Math.floor(dp.month / 12);
+          const mo = dp.month % 12;
+          labels.push(dp.month === 0 ? `${startYear}年` : `${yr}/${String(mo || 12).padStart(2, '0')}`);
+          dataMix.push(dp.total);
+          dataSP.push(sp100.dataPoints[i] ? sp100.dataPoints[i].total : null);
+          dataCash.push(cash100.dataPoints[i] ? cash100.dataPoints[i].total : null);
+          dataInvested.push(dp.invested);
+        }
+      }
+
+      if (mainChart) mainChart.destroy();
+
+      const ctx = document.getElementById('mainChart').getContext('2d');
+      mainChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: `混合（S&P ${parseInt(allocSlider.value)}% / 現金 ${100 - parseInt(allocSlider.value)}%）`,
+              data: dataMix,
+              borderColor: '#3b82f6',
+              backgroundColor: 'rgba(59, 130, 246, 0.08)',
+              borderWidth: 2.5,
+              fill: true,
+              pointRadius: 0,
+              pointHoverRadius: 5,
+              tension: 0.3,
+              order: 1
+            },
+            {
+              label: 'S&P 500 100%',
+              data: dataSP,
+              borderColor: '#8b5cf6',
+              backgroundColor: 'transparent',
+              borderWidth: 1.5,
+              borderDash: [6, 3],
+              pointRadius: 0,
+              pointHoverRadius: 4,
+              tension: 0.3,
+              order: 2
+            },
+            {
+              label: '現金 100%',
+              data: dataCash,
+              borderColor: '#f59e0b',
+              backgroundColor: 'transparent',
+              borderWidth: 1.5,
+              borderDash: [3, 3],
+              pointRadius: 0,
+              pointHoverRadius: 4,
+              tension: 0.3,
+              order: 3
+            },
+            {
+              label: '累計投資額',
+              data: dataInvested,
+              borderColor: 'rgba(100, 116, 139, 0.5)',
+              backgroundColor: 'transparent',
+              borderWidth: 1,
+              borderDash: [2, 4],
+              pointRadius: 0,
+              pointHoverRadius: 3,
+              tension: 0,
+              order: 4
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: {
+                color: '#94a3b8',
+                font: { family: 'Inter', size: 12 },
+                usePointStyle: true,
+                pointStyleWidth: 24,
+                padding: 16
+              }
+            },
+            tooltip: {
+              backgroundColor: 'rgba(17, 24, 39, 0.95)',
+              titleColor: '#f1f5f9',
+              bodyColor: '#94a3b8',
+              borderColor: 'rgba(255,255,255,0.1)',
+              borderWidth: 1,
+              cornerRadius: 8,
+              padding: 12,
+              bodyFont: { family: 'Inter' },
+              titleFont: { family: 'Inter', weight: '600' },
+              callbacks: {
+                label: ctx => `${ctx.dataset.label}: ${fmtMan(ctx.parsed.y)}`
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: {
+                color: '#64748b',
+                font: { size: 10 },
+                maxRotation: 45,
+                maxTicksLimit: 20
+              },
+              grid: { color: 'rgba(255,255,255,0.03)' }
+            },
+            y: {
+              ticks: {
+                color: '#64748b',
+                font: { size: 11 },
+                callback: v => fmtMan(v)
+              },
+              grid: { color: 'rgba(255,255,255,0.05)' }
+            }
+          }
+        }
+      });
+
+      // ─── Annual Table ───
+      const tbody = document.getElementById('tableBody');
+      tbody.innerHTML = '';
+
+      for (let y = 0; y <= duration; y++) {
+        const year = startYear + y;
+        const idx = y * 12; // end-of-year index
+        if (idx >= mix.dataPoints.length) break;
+
+        const dpMix = mix.dataPoints[idx];
+        const dpSP = sp100.dataPoints[idx];
+        const dpCash = cash100.dataPoints[idx];
+
+        const ret = SP500_RETURNS[year];
+        const retStr = y === 0 ? '—' : (ret !== undefined ? fmtPct(ret) : 'N/A');
+        const retClass = ret !== undefined && ret < 0 ? 'negative' : (ret > 0 ? 'positive' : '');
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+      <td>${year}年${y === 0 ? '（開始）' : ''}</td>
+      <td class="${retClass}">${retStr}</td>
+      <td>${fmtMan(dpMix.total)}</td>
+      <td>${fmtMan(dpSP.total)}</td>
+      <td>${fmtMan(dpCash.total)}</td>
+      <td>${fmtMan(dpMix.invested)}</td>
+    `;
+        tbody.appendChild(tr);
+      }
+
+      // Show results
+      const resultsDiv = document.getElementById('results');
+      resultsDiv.classList.remove('hidden');
+
+      // Scroll to results
+      setTimeout(() => {
+        resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+  </script>
+
+</body>
+
+</html>
